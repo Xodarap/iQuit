@@ -21,19 +21,24 @@ def find_updated_date():
     not_found_yet = set(raw_vals)
     last_update = dict()
     for month in range(12,0,-1):
-        cutoff = datetime.datetime(2014,12,24).utctimetuple()
-        cutoff = calendar.timegm(cutoff)
+        cutoff = datetime.datetime(2013,month,1).utctimetuple()
+        cutoff = calendar.timegm(cutoff) * 1000  # linkedin uses milliseconds
+        print(cutoff)
         peeps = app.get_connections(selectors = ['id'],
                                params = {"modified": "updated",
                                           "modified-since": cutoff
                                           })
-        print(len(peeps['values']))
+        # no one updated since then
+        if not ('values' in peeps):
+            continue
+
         for person in peeps['values']:
             person_id = person[u'id']
             if person_id in not_found_yet:
                 last_update[person_id] = cutoff
+                r.table('people').get(person_id).update({'last_update': cutoff}).run(conn)
                 not_found_yet.remove(person_id)
 
-                #print(last_update)
+    #print(set(last_update.values()))
 
 find_updated_date()
