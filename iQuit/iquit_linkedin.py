@@ -1,17 +1,53 @@
 from linkedin import linkedin
 import il_auth
 import rethinkdb as r
-import datetime
+from datetime import datetime
 import calendar
+from dict_compare import dict_compare
 
 app = il_auth.getApp()
 conn = r.connect(db = 'iquit')
 
+basic_fields = ['id','first-name','last-name','headline','location',
+                'industry', 'current-share', 'summary',
+                'specialties', 'positions', 'picture-url']
+
 def add_peeps():
-    peeps = app.get_connections(selectors = ['id', 'first-name', 'last-name',
-                                             'positions'] 
-                                          )
-    r.table('people').insert(peeps['values']).run(conn)
+    #peeps = app.get_connections(selectors = ['id', 'first-name', 'last-name',
+    #                                         'positions'] 
+    #                                      )
+    now_inst = str(datetime.now())
+    page_size = 25
+    pages = 4
+    for start_page in range(0, page_size * pages, page_size):
+        peeps = app.search_profile(selectors = [{'people': ['id']}],
+                                   params = {'company-name': 'amazon',
+                                             'current-company': 'true',
+                                             'count': page_size,
+                                             'start': start_page * page_size})
+        put_peeps_in(peeps, now_inst)
+    
+
+def put_peeps_in(peeps, now_inst = str(datetime.now())):
+    peeps = peeps['people']['values']
+    def get_profile(person):
+        profile = {}
+        profile['data'] = app.get_profile(person['id'], selectors = basic_fields)
+        query = r.table('people_overtime').filter({'id': person['id']}).order_by('instant')
+        old_profile = query[0].run(conn)['data'] if query.count().run(conn) > 0 else {} 
+        if dict_compare(profile['data'], old_profile): 
+            return None
+        else:
+            profile['instant'] = now_inst
+            profile['id'] = person['id']
+            profile['id_instant'] = profile['id'] + '^' + profile['instant']
+            return profile
+
+    peeps = map(get_profile, peeps)
+    peeps = filter(lambda x: x != None, peeps)
+    r.table('people_overtime').insert(peeps).run(conn)
+    return (peeps)
+
 
 #add_peeps()
 
@@ -21,7 +57,7 @@ def find_updated_date():
     not_found_yet = set(raw_vals)
     last_update = dict()
     for month in range(12,0,-1):
-        cutoff = datetime.datetime(2013,month,1).utctimetuple()
+        cutoff = datetime(2013,month,1).utctimetuple()
         cutoff = calendar.timegm(cutoff) * 1000  # linkedin uses milliseconds
         print(cutoff)
         peeps = app.get_connections(selectors = ['id'],
@@ -41,4 +77,4 @@ def find_updated_date():
 
     #print(set(last_update.values()))
 
-find_updated_date()
+#find_updated_date()
