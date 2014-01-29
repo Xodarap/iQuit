@@ -8,27 +8,31 @@ from dict_compare import dict_compare
 app = il_auth.getApp()
 conn = r.connect(db = 'iquit')
 
+# all of the fields we can get with r_basic permission
 basic_fields = ['id','first-name','last-name','headline','location',
                 'industry', 'current-share', 'summary',
                 'specialties', 'positions', 'picture-url']
 
 def add_peeps():
+    '''Outer loop to add profiles'''
     #peeps = app.get_connections(selectors = ['id', 'first-name', 'last-name',
     #                                         'positions'] 
     #                                      )
     now_inst = str(datetime.now())
     page_size = 25
-    pages = 4
-    for start_page in range(0, page_size * pages, page_size):
+    pages = 40
+    offset = 4
+    for start_page in range(offset * page_size, page_size * pages, page_size):
         peeps = app.search_profile(selectors = [{'people': ['id']}],
                                    params = {'company-name': 'amazon',
                                              'current-company': 'true',
                                              'count': page_size,
-                                             'start': start_page * page_size})
+                                             'start': start_page})
         put_peeps_in(peeps, now_inst)
     
 
 def put_peeps_in(peeps, now_inst = str(datetime.now())):
+    '''Does a diff and adds any new profiles'''
     peeps = peeps['people']['values']
     def get_profile(person):
         profile = {}
